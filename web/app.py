@@ -17,7 +17,7 @@ Agent Chat - 完整版 Web 界面
     streamlit run web/app.py --server.address 0.0.0.0 --server.port 8501
 
 Windows 访问：
-    http://192.168.16.58:8501
+    http://<服务器IP>:8501
 """
 
 import os

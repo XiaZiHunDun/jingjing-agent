@@ -55,7 +55,7 @@ streamlit run web/app.py --server.address 0.0.0.0 --server.port 8501
 ### 4. 访问界面
 
 - **本地访问**: http://localhost:8501
-- **远程访问**: http://192.168.16.58:8501
+- **远程访问**: http://<服务器IP>:8501
 
 ## 📁 项目结构
 
