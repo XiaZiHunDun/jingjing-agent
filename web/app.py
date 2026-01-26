@@ -198,7 +198,162 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 自定义样式
+# 获取当前主题
+def get_theme_styles():
+    """根据当前主题返回对应的 CSS 样式"""
+    is_dark = st.session_state.get("dark_mode", False)
+    
+    if is_dark:
+        # 深色模式
+        return """
+        <style>
+            /* 深色模式基础样式 */
+            .stApp {
+                background-color: #1a1a2e !important;
+            }
+            .main-header {
+                font-size: 2.5rem;
+                font-weight: bold;
+                background: linear-gradient(90deg, #a78bfa 0%, #f472b6 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                text-align: center;
+                padding: 1rem 0;
+            }
+            .tool-badge {
+                display: inline-block;
+                padding: 0.25rem 0.5rem;
+                margin: 0.1rem;
+                border-radius: 0.25rem;
+                font-size: 0.8rem;
+                background-color: #374151;
+                color: #93c5fd;
+            }
+            .success-box {
+                padding: 1rem;
+                border-radius: 0.5rem;
+                background-color: #064e3b;
+                border-left: 4px solid #10b981;
+                margin: 1rem 0;
+                color: #d1fae5;
+            }
+            .info-box {
+                padding: 1rem;
+                border-radius: 0.5rem;
+                background-color: #1e3a5f;
+                border-left: 4px solid #3b82f6;
+                margin: 1rem 0;
+                color: #bfdbfe;
+            }
+            .stChatMessage {
+                padding: 1rem;
+            }
+            /* 深色模式侧边栏 */
+            [data-testid="stSidebar"] {
+                background-color: #16213e !important;
+            }
+            [data-testid="stSidebar"] .stMarkdown {
+                color: #e2e8f0 !important;
+            }
+            /* 深色模式文件上传 */
+            [data-testid="stFileUploader"] [data-testid="stFileUploaderDropzone"]::after {
+                content: "📁 点击或拖拽文件 (TXT/MD/PDF/Word)";
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #374151;
+                border: 2px dashed #6b7280;
+                border-radius: 8px;
+                color: #d1d5db;
+                font-size: 14px;
+                pointer-events: none;
+                z-index: 1;
+            }
+            [data-testid="stFileUploader"] [data-testid="stFileUploaderDropzone"]:hover::after {
+                border-color: #a78bfa;
+                color: #a78bfa;
+            }
+            /* 深色模式输入框 */
+            .stTextInput input, .stTextArea textarea {
+                background-color: #374151 !important;
+                color: #f3f4f6 !important;
+                border-color: #4b5563 !important;
+            }
+            /* 深色模式按钮 */
+            .stButton > button {
+                background-color: #4f46e5 !important;
+                color: white !important;
+            }
+            .stButton > button:hover {
+                background-color: #6366f1 !important;
+            }
+        </style>
+        """
+    else:
+        # 浅色模式
+        return """
+        <style>
+            .main-header {
+                font-size: 2.5rem;
+                font-weight: bold;
+                background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                text-align: center;
+                padding: 1rem 0;
+            }
+            .tool-badge {
+                display: inline-block;
+                padding: 0.25rem 0.5rem;
+                margin: 0.1rem;
+                border-radius: 0.25rem;
+                font-size: 0.8rem;
+                background-color: #e3f2fd;
+                color: #1565c0;
+            }
+            .success-box {
+                padding: 1rem;
+                border-radius: 0.5rem;
+                background-color: #e8f5e9;
+                border-left: 4px solid #4caf50;
+                margin: 1rem 0;
+            }
+            .info-box {
+                padding: 1rem;
+                border-radius: 0.5rem;
+                background-color: #e3f2fd;
+                border-left: 4px solid #2196f3;
+                margin: 1rem 0;
+            }
+            .stChatMessage {
+                padding: 1rem;
+            }
+            /* 浅色模式文件上传 */
+            [data-testid="stFileUploader"] [data-testid="stFileUploaderDropzone"]::after {
+                content: "📁 点击或拖拽文件 (TXT/MD/PDF/Word)";
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #fafafa;
+                border: 2px dashed #ccc;
+                border-radius: 8px;
+                color: #666;
+                font-size: 14px;
+                pointer-events: none;
+                z-index: 1;
+            }
+            [data-testid="stFileUploader"] [data-testid="stFileUploaderDropzone"]:hover::after {
+                border-color: #667eea;
+                color: #667eea;
+            }
+        </style>
+        """
+
+# 自定义样式（旧版兼容，实际使用 get_theme_styles）
 st.markdown("""
 <style>
     .main-header {
@@ -602,7 +757,20 @@ def add_document_to_knowledge_base(content: str, filename: str):
 def render_sidebar():
     """渲染侧边栏"""
     with st.sidebar:
-        st.markdown('<p class="main-header">🤖 晶晶助手</p>', unsafe_allow_html=True)
+        # 主题切换
+        col_title, col_theme = st.columns([3, 1])
+        with col_title:
+            st.markdown('<p class="main-header">🤖 晶晶助手</p>', unsafe_allow_html=True)
+        with col_theme:
+            # 初始化深色模式状态
+            if "dark_mode" not in st.session_state:
+                st.session_state.dark_mode = False
+            
+            # 主题切换按钮
+            theme_icon = "🌙" if not st.session_state.dark_mode else "☀️"
+            if st.button(theme_icon, key="theme_toggle", help="切换深色/浅色模式"):
+                st.session_state.dark_mode = not st.session_state.dark_mode
+                st.rerun()
         
         st.markdown("---")
         
@@ -749,6 +917,21 @@ def render_sidebar():
         
         st.markdown("---")
         
+        # 显示设置
+        st.subheader("⚙️ 显示设置")
+        
+        # 初始化流式输出状态
+        if "stream_output" not in st.session_state:
+            st.session_state.stream_output = True
+        
+        st.session_state.stream_output = st.toggle(
+            "🌊 流式输出", 
+            value=st.session_state.stream_output,
+            help="开启后回答将逐字显示，关闭则一次性显示"
+        )
+        
+        st.markdown("---")
+        
         # 系统信息
         st.subheader("ℹ️ 系统状态")
         
@@ -773,11 +956,18 @@ def render_sidebar():
 def render_chat():
     """渲染聊天界面"""
     
+    # 应用主题样式
+    st.markdown(get_theme_styles(), unsafe_allow_html=True)
+    
+    # 根据主题调整标题颜色
+    is_dark = st.session_state.get("dark_mode", False)
+    subtitle_color = "#a1a1aa" if is_dark else "#666"
+    
     # 标题
-    st.markdown("""
+    st.markdown(f"""
     <div style="text-align: center; padding: 1rem 0;">
         <h1>💬 智能助手对话</h1>
-        <p style="color: #666;">我是晶晶，可以帮你计算、查询时间、搜索知识库</p>
+        <p style="color: {subtitle_color};">我是晶晶，可以帮你计算、查询时间、搜索知识库</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -926,8 +1116,23 @@ def process_message(prompt: str):
                         if i < len(thinking_steps):
                             st.markdown("---")
             
-            # 显示最终回复
-            answer_placeholder.markdown(answer)
+            # 显示最终回复（支持流式/非流式）
+            if st.session_state.get("stream_output", True):
+                # 流式显示
+                import time
+                displayed_text = ""
+                
+                # 逐字显示效果
+                for char in answer:
+                    displayed_text += char
+                    answer_placeholder.markdown(displayed_text + "▌")  # 显示光标
+                    time.sleep(0.015)  # 控制速度，15ms 每字符
+                
+                # 移除光标，显示完整内容
+                answer_placeholder.markdown(answer)
+            else:
+                # 直接显示
+                answer_placeholder.markdown(answer)
             
             # 保存到历史
             st.session_state.messages.append({
