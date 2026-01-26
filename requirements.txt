@@ -1,0 +1,36 @@
+# ========================================
+# Agent Learn 2 - 项目依赖
+# ========================================
+
+# LangChain 核心
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-community>=0.3.0
+langgraph>=0.2.0
+
+# 向量数据库
+chromadb>=0.5.0
+faiss-cpu>=1.8.0
+
+# Web 服务
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+streamlit>=1.40.0
+websockets>=14.0
+python-multipart>=0.0.12
+
+# 工具库
+python-dotenv>=1.0.0
+pyyaml>=6.0
+httpx>=0.28.0
+requests>=2.32.0
+
+# 开发工具
+jupyter>=1.0.0
+ipykernel>=6.29.0
+pytest>=8.0.0
+rich>=13.9.0
+
+# 文档处理
+pypdf>=3.0.0
+python-docx>=0.8.11
