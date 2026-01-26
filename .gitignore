@@ -47,6 +47,11 @@ data/chroma_db/
 data/chat_history.db
 *.db
 
+# 用户上传的文档（保留示例 .md 文件）
+data/docs/*.pdf
+data/docs/*.docx
+data/docs/*.txt
+
 # Docker 镜像
 *.tar
 

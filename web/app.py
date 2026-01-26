@@ -341,10 +341,12 @@ def get_agent():
     
     @tool
     def get_current_time() -> str:
-        """获取当前日期和时间"""
-        now = datetime.datetime.now()
+        """获取当前日期和时间（北京时间）"""
+        # 使用北京时区 (UTC+8)
+        beijing_tz = datetime.timezone(datetime.timedelta(hours=8))
+        now = datetime.datetime.now(beijing_tz)
         weekdays = ['一', '二', '三', '四', '五', '六', '日']
-        return f"当前时间: {now.strftime('%Y年%m月%d日 %H:%M:%S')} (星期{weekdays[now.weekday()]})"
+        return f"当前时间: {now.strftime('%Y年%m月%d日 %H:%M:%S')} (星期{weekdays[now.weekday()]}，北京时间)"
     
     @tool
     def get_weather(city: str) -> str:
@@ -353,14 +355,13 @@ def get_agent():
         参数 city: 城市名称，如 "北京"、"上海"、"深圳"
         """
         import httpx
+        
+        # 使用 wttr.in 免费天气 API (使用 HTTP 更稳定)
+        url = f"http://wttr.in/{city}?format=%l:+%c+%t+%h+%w&lang=zh"
+        
         try:
-            # 使用 wttr.in 免费天气 API
-            url = f"https://wttr.in/{city}?format=%l:+%c+%t+%h+%w&lang=zh"
-            
-            # 配置代理
-            proxy = os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
-            
-            with httpx.Client(proxy=proxy, timeout=10, follow_redirects=True) as client:
+            # 直接请求，不使用代理（wttr.in 可以直连）
+            with httpx.Client(timeout=15, follow_redirects=True) as client:
                 response = client.get(url)
                 if response.status_code == 200:
                     return f"🌤️ 天气查询结果:\n{response.text.strip()}"
@@ -871,11 +872,18 @@ def process_message(prompt: str):
             # 获取回复
             answer = result["messages"][-1].content
             
-            # 收集完整的思考过程
+            # 收集本次回复的思考过程（只处理最后一轮对话）
             thinking_steps = []
             tool_results = {}
             
-            for msg in result["messages"]:
+            # 找到最后一个用户消息的位置，只处理之后的消息
+            last_human_idx = 0
+            for i, msg in enumerate(result["messages"]):
+                if hasattr(msg, 'content') and isinstance(msg, HumanMessage):
+                    last_human_idx = i
+            
+            # 只处理最后一个用户消息之后的消息
+            for msg in result["messages"][last_human_idx + 1:]:
                 # AI 决定调用工具
                 if hasattr(msg, 'tool_calls') and msg.tool_calls:
                     for tc in msg.tool_calls:
