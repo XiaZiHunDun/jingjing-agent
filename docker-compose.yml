@@ -1,6 +1,6 @@
 # ============================================================
 # Agent Learn 2 - Docker Compose 配置
-# 使用: docker-compose up -d
+# 使用: docker compose up -d
 # ============================================================
 
 version: '3.8'
@@ -10,18 +10,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # 构建时使用代理（从 .env 读取，可选）
+        - HTTP_PROXY=${HTTP_PROXY:-}
+        - HTTPS_PROXY=${HTTPS_PROXY:-}
     container_name: jingjing-agent
     ports:
       - "8501:8501"
     volumes:
       # 持久化数据目录
       - ./data:/app/data
-      # 环境变量文件
+      # 环境变量文件（应用读取 API Key 等配置）
       - ./.env:/app/.env:ro
     environment:
+      # 只传递必要的环境变量，不传递代理
       - TZ=Asia/Shanghai
-    env_file:
-      - .env
+      - KIMI_API_KEY=${KIMI_API_KEY}
+      - KIMI_BASE_URL=${KIMI_BASE_URL:-https://api.moonshot.cn/v1}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]

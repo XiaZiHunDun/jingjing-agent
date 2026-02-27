@@ -26,10 +26,19 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
+# 从 .env 文件读取代理配置（用于构建时）
+source .env 2>/dev/null || true
+
 case "$1" in
     build)
         echo "📦 构建 Docker 镜像..."
-        docker build -t $IMAGE_NAME .
+        # 构建时传入代理参数（如果配置了的话）
+        BUILD_ARGS=""
+        if [ -n "$HTTP_PROXY" ]; then
+            echo "   使用代理: $HTTP_PROXY"
+            BUILD_ARGS="--build-arg HTTP_PROXY=$HTTP_PROXY --build-arg HTTPS_PROXY=$HTTPS_PROXY"
+        fi
+        docker build $BUILD_ARGS -t $IMAGE_NAME .
         echo "✅ 镜像构建完成: $IMAGE_NAME"
         ;;
     

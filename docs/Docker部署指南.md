@@ -65,11 +65,17 @@ cat > .env << 'EOF'
 KIMI_API_KEY=your_kimi_api_key_here
 KIMI_BASE_URL=https://api.moonshot.cn/v1
 
-# 代理配置（如需要）
+# 代理配置（可选）
+# - 构建镜像时：用于下载 Python 依赖
+# - 运行容器时：供应用代码访问外部 API
 HTTP_PROXY=http://your-proxy:port
 HTTPS_PROXY=http://your-proxy:port
 EOF
 ```
+
+> **代理说明**：
+> - **构建时**：`docker-build.sh build` 或 `docker compose build` 会自动读取 `.env` 中的代理配置，通过 `--build-arg` 传入构建过程
+> - **运行时**：代理**不会**作为系统环境变量传入容器，应用通过读取挂载的 `.env` 文件获取代理配置
 
 ---
 
@@ -81,35 +87,33 @@ EOF
 # 创建数据目录
 mkdir -p data
 
-# 启动容器
+# 启动容器（无需传递代理参数，代理仅在构建时使用）
 docker run -d \
   --name jingjing-agent \
   -p 8501:8501 \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/.env:/app/.env:ro \
-  -e HTTP_PROXY=http://your-proxy:port \
-  -e HTTPS_PROXY=http://your-proxy:port \
   --restart unless-stopped \
   jingjing-agent:latest
 ```
 
-### 方式二：docker-compose（推荐）
+### 方式二：docker compose（推荐）
 
 ```bash
-# 启动
-docker-compose up -d
+# 启动（自动从 .env 读取代理用于构建）
+docker compose up -d
 
 # 查看状态
-docker-compose ps
+docker compose ps
 
 # 停止
-docker-compose down
+docker compose down
 ```
 
-### 方式三：使用便捷脚本
+### 方式三：使用便捷脚本（推荐）
 
 ```bash
-# 构建镜像
+# 构建镜像（自动从 .env 读取代理配置）
 ./docker-build.sh build
 
 # 启动容器
@@ -121,6 +125,9 @@ docker-compose down
 # 停止容器
 ./docker-build.sh stop
 ```
+
+> **关于代理配置**：代理仅在**构建镜像时**用于下载依赖，**容器运行时不使用代理**。
+> 如果需要代理，只需在 `.env` 文件中配置 `HTTP_PROXY` 和 `HTTPS_PROXY`，构建脚本会自动读取。
 
 ---
 
@@ -205,7 +212,7 @@ docker load -i jingjing-agent.tar
 # 解压配置
 tar -xzvf config.tar.gz
 
-# 启动容器
+# 启动容器（镜像已包含所有依赖，无需代理）
 docker run -d \
   --name jingjing-agent \
   -p 8501:8501 \
@@ -214,6 +221,8 @@ docker run -d \
   --restart unless-stopped \
   jingjing-agent:latest
 ```
+
+> 💡 迁移后的镜像已包含所有依赖，运行时无需配置代理。
 
 ---
 
@@ -239,15 +248,24 @@ docker logs jingjing-agent
 # 2. API Key 无效
 ```
 
-### Q3: 无法访问 API
+### Q3: 无法访问 Kimi API
+
+应用通过 `.env` 文件读取 API 配置：
 
 ```bash
-# 确保传入了代理环境变量
-docker run -d \
-  -e HTTP_PROXY=http://your-proxy:port \
-  -e HTTPS_PROXY=http://your-proxy:port \
-  ...
+# 检查 .env 文件是否正确挂载
+docker exec jingjing-agent cat /app/.env
+
+# 确保 .env 包含正确的 API Key
+KIMI_API_KEY=your_api_key_here
+KIMI_BASE_URL=https://api.moonshot.cn/v1
+
+# 如果需要代理访问 API，在 .env 中配置（应用层面读取）
+HTTP_PROXY=http://your-proxy:port
+HTTPS_PROXY=http://your-proxy:port
 ```
+
+> 注意：代理配置在 `.env` 中是供**应用代码**读取的，不是系统级环境变量。
 
 ### Q4: 数据丢失
 
