@@ -142,7 +142,13 @@ def create_rag_tool(vector_store):
     )
     
     rag_prompt = ChatPromptTemplate.from_template(
-        "根据以下资料回答问题：\n\n{context}\n\n问题：{question}\n\n请基于资料回答，如果资料中没有相关信息，请说明。"
+        """根据以下资料回答问题：
+
+{context}
+
+问题：{question}
+
+请基于资料回答，如果资料中没有相关信息，请说明。回答完成后，请在末尾注明参考来源。"""
     )
     
     llm = get_llm()
@@ -157,16 +163,27 @@ def create_rag_tool(vector_store):
             query: 搜索问题或关键词
             
         Returns:
-            从知识库检索到的相关信息
+            从知识库检索到的相关信息，包含参考来源
         """
         try:
             docs = retriever.invoke(query)
             if not docs:
                 return "未找到相关信息"
             
-            context = "\n\n---\n\n".join([doc.page_content for doc in docs])
+            sources = list(set(doc.metadata.get("source", "unknown") for doc in docs))
+            
+            context_parts = []
+            for doc in docs:
+                source = doc.metadata.get("source", "unknown")
+                context_parts.append(f"[来源: {source}]\n{doc.page_content}")
+            
+            context = "\n\n---\n\n".join(context_parts)
             chain = rag_prompt | llm | StrOutputParser()
-            return chain.invoke({"context": context, "question": query})
+            answer = chain.invoke({"context": context, "question": query})
+            
+            source_note = "\n\n📚 **参考来源**: " + ", ".join(sources)
+            
+            return answer + source_note
             
         except Exception as e:
             return f"搜索错误: {str(e)}"
@@ -190,3 +207,112 @@ def similarity_search(query: str, k: int = 3) -> List[Document]:
         return []
     
     return vector_store.similarity_search(query, k=k)
+
+
+def get_all_documents() -> List[dict]:
+    """
+    获取知识库中所有文档的信息
+    
+    Returns:
+        文档信息列表，每个文档包含 source 和 chunk_count
+    """
+    from langchain_community.vectorstores import Chroma
+    
+    if not os.path.exists(Config.CHROMA_DIR):
+        return []
+    
+    try:
+        embeddings = get_embeddings()
+        vector_store = Chroma(
+            persist_directory=str(Config.CHROMA_DIR),
+            embedding_function=embeddings,
+            collection_name=Config.CHROMA_COLLECTION_NAME
+        )
+        
+        collection = vector_store._collection
+        results = collection.get(include=["metadatas"])
+        
+        if not results or not results.get("metadatas"):
+            return []
+        
+        doc_counts = {}
+        for metadata in results["metadatas"]:
+            source = metadata.get("source", "unknown")
+            doc_counts[source] = doc_counts.get(source, 0) + 1
+        
+        documents = [
+            {"source": source, "chunk_count": count}
+            for source, count in sorted(doc_counts.items())
+        ]
+        
+        return documents
+        
+    except Exception as e:
+        print(f"获取文档列表失败: {e}")
+        return []
+
+
+def delete_document(source: str) -> Tuple[bool, str]:
+    """
+    从知识库中删除指定文档
+    
+    Args:
+        source: 文档来源名称（文件名）
+        
+    Returns:
+        (是否成功, 消息)
+    """
+    from langchain_community.vectorstores import Chroma
+    
+    if not os.path.exists(Config.CHROMA_DIR):
+        return False, "知识库不存在"
+    
+    try:
+        embeddings = get_embeddings()
+        vector_store = Chroma(
+            persist_directory=str(Config.CHROMA_DIR),
+            embedding_function=embeddings,
+            collection_name=Config.CHROMA_COLLECTION_NAME
+        )
+        
+        collection = vector_store._collection
+        results = collection.get(
+            where={"source": source},
+            include=["metadatas"]
+        )
+        
+        if not results or not results.get("ids"):
+            return False, f"未找到文档: {source}"
+        
+        ids_to_delete = results["ids"]
+        collection.delete(ids=ids_to_delete)
+        
+        doc_path = Config.DOCS_DIR / source
+        if doc_path.exists():
+            doc_path.unlink()
+        
+        return True, f"成功删除 {len(ids_to_delete)} 个文档块"
+        
+    except Exception as e:
+        return False, f"删除失败: {str(e)}"
+
+
+def similarity_search_with_source(query: str, k: int = 3) -> Tuple[List[Document], List[str]]:
+    """
+    相似度搜索并返回来源信息
+    
+    Args:
+        query: 查询文本
+        k: 返回结果数量
+        
+    Returns:
+        (相关文档列表, 来源文件名列表)
+    """
+    vector_store = get_vector_store()
+    if vector_store is None:
+        return [], []
+    
+    docs = vector_store.similarity_search(query, k=k)
+    sources = list(set(doc.metadata.get("source", "unknown") for doc in docs))
+    
+    return docs, sources

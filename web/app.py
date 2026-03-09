@@ -43,7 +43,9 @@ from src.memory.vector_store import (
     get_embeddings, 
     get_vector_store, 
     add_documents_to_store,
-    create_rag_tool
+    create_rag_tool,
+    get_all_documents,
+    delete_document
 )
 from src.db.chat_history import (
     init_database,
@@ -392,15 +394,42 @@ def render_sidebar():
         
         st.markdown("---")
         
+        # 知识库文档管理
+        st.subheader("知识库文档")
+        
+        kb_docs = get_all_documents()
+        if kb_docs:
+            st.caption(f"共 {len(kb_docs)} 个文档")
+            
+            for doc in kb_docs:
+                col_name, col_info, col_del = st.columns([3, 1, 1])
+                with col_name:
+                    st.markdown(f"📄 `{doc['source']}`")
+                with col_info:
+                    st.caption(f"{doc['chunk_count']}块")
+                with col_del:
+                    if st.button("🗑️", key=f"del_doc_{doc['source']}", help=f"删除 {doc['source']}"):
+                        success, msg = delete_document(doc['source'])
+                        if success:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+        else:
+            st.caption("暂无文档，请上传")
+        
+        st.markdown("---")
+        
         # 系统信息
         st.subheader("系统状态")
         
         vector_store = init_vector_store_cached()
         kb_status = "已加载" if vector_store else "未加载"
+        doc_count = len(kb_docs) if kb_docs else 0
         
         st.markdown(f"""
         - **LLM**: Kimi API
-        - **知识库**: {kb_status}
+        - **知识库**: {kb_status} ({doc_count} 文档)
         - **记忆**: 已启用
         """)
         

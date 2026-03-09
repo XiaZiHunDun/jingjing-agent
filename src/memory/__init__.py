@@ -11,6 +11,9 @@ from src.memory.vector_store import (
     add_documents_to_store,
     create_rag_tool,
     similarity_search,
+    get_all_documents,
+    delete_document,
+    similarity_search_with_source,
 )
 
 __all__ = [
@@ -20,4 +23,7 @@ __all__ = [
     "add_documents_to_store",
     "create_rag_tool",
     "similarity_search",
+    "get_all_documents",
+    "delete_document",
+    "similarity_search_with_source",
 ]
