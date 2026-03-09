@@ -148,3 +148,41 @@ class ErrorResponse(BaseModel):
     error: str = Field(..., description="错误类型")
     message: str = Field(..., description="错误详情")
     timestamp: datetime = Field(default_factory=datetime.now, description="错误时间")
+
+
+# ============================================================
+# 会话管理模型
+# ============================================================
+
+class SessionInfo(BaseModel):
+    """会话信息"""
+    session_id: str = Field(..., description="会话 ID")
+    title: str = Field(..., description="会话标题")
+    updated_at: str = Field(..., description="最后更新时间")
+    msg_count: int = Field(..., description="消息数量")
+
+
+class SessionListResponse(BaseModel):
+    """会话列表响应"""
+    sessions: List[SessionInfo] = Field(default_factory=list, description="会话列表")
+    total: int = Field(..., description="会话总数")
+
+
+class MessageInfo(BaseModel):
+    """消息信息"""
+    role: str = Field(..., description="角色: user/assistant")
+    content: str = Field(..., description="消息内容")
+    thinking_steps: Optional[List[Dict[str, Any]]] = Field(default=None, description="思考过程")
+
+
+class SessionDetailResponse(BaseModel):
+    """会话详情响应"""
+    session_id: str = Field(..., description="会话 ID")
+    messages: List[MessageInfo] = Field(default_factory=list, description="消息列表")
+    msg_count: int = Field(..., description="消息数量")
+
+
+class SessionDeleteResponse(BaseModel):
+    """会话删除响应"""
+    success: bool = Field(..., description="是否成功")
+    message: str = Field(..., description="结果消息")

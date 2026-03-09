@@ -55,6 +55,46 @@ API_KEYS=key1,key2,key3
 - `GET /` - API 信息
 - `GET /health` - 健康检查
 - `GET /api/stats` - 统计数据
+- `GET /api/rate-limit` - 速率限制状态
+
+---
+
+## 速率限制
+
+API 对高频接口（`/api/chat`、`/api/knowledge/upload`）启用了速率限制：
+
+| 限制类型 | 默认值 | 说明 |
+|----------|--------|------|
+| 每分钟请求数 | 60 | 滑动窗口 |
+| 每小时请求数 | 1000 | 滑动窗口 |
+| 突发限制 | 10 | 防止瞬时高频请求 |
+
+### 响应头
+
+限流接口的响应会包含以下头信息：
+- `X-RateLimit-Limit`: 每分钟限制
+- `X-RateLimit-Remaining`: 剩余次数
+
+### 超限响应
+
+超过限制时返回 HTTP 429：
+```json
+{
+  "error": "RateLimitExceeded",
+  "message": "超过每分钟请求限制 (60/分钟)",
+  "retry_after": 30
+}
+```
+
+### 配置
+
+在 `.env` 中配置：
+```bash
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_PER_MINUTE=60
+RATE_LIMIT_PER_HOUR=1000
+RATE_LIMIT_BURST=10
+```
 
 ---
 
@@ -172,7 +212,45 @@ curl -H "X-API-Key: your-api-key" http://localhost:8000/api/tools
 
 ---
 
-### 5. 知识库管理
+### 6. 会话管理
+
+#### 获取会话列表
+
+```bash
+curl -H "X-API-Key: your-api-key" http://localhost:8000/api/sessions
+```
+
+**响应示例：**
+```json
+{
+  "sessions": [
+    {
+      "session_id": "s_100831",
+      "title": "什么是多智能体系统",
+      "updated_at": "2026-03-09 10:08:51",
+      "msg_count": 2
+    }
+  ],
+  "total": 3
+}
+```
+
+#### 获取会话详情
+
+```bash
+curl -H "X-API-Key: your-api-key" http://localhost:8000/api/sessions/s_100831
+```
+
+#### 删除会话
+
+```bash
+curl -X DELETE -H "X-API-Key: your-api-key" \
+  http://localhost:8000/api/sessions/s_100831
+```
+
+---
+
+### 7. 知识库管理
 
 #### 获取文档列表
 

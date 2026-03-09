@@ -22,6 +22,7 @@ from api.schemas import (
     ErrorResponse
 )
 from api.auth import verify_api_key
+from api.rate_limit import rate_limiter
 from src.utils.logger import chat_logger, RequestStats
 
 router = APIRouter(prefix="/api", tags=["聊天"])

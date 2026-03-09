@@ -32,9 +32,10 @@ load_dotenv()
 
 from api import __version__
 from api.schemas import HealthStatus, ErrorResponse
-from api.routers import chat_router, knowledge_router
+from api.routers import chat_router, knowledge_router, session_router
 from api.auth import is_auth_enabled
-from api.middleware import LoggingMiddleware
+from api.middleware import LoggingMiddleware, RateLimitMiddleware
+from api.rate_limit import rate_limiter, DEFAULT_CONFIG as RATE_LIMIT_CONFIG
 from src.utils.logger import app_logger, RequestStats
 
 
@@ -63,6 +64,11 @@ async def lifespan(app: FastAPI):
         app_logger.warning("[!] API 认证未启用（开发模式）")
     
     app_logger.info("[✓] 日志和监控已启用")
+    
+    if RATE_LIMIT_CONFIG.enabled:
+        app_logger.info(f"[✓] 速率限制已启用 ({RATE_LIMIT_CONFIG.requests_per_minute}/分钟)")
+    else:
+        app_logger.warning("[!] 速率限制未启用")
     
     app_logger.info("=" * 50)
     app_logger.info("API 服务已就绪")
@@ -123,6 +129,7 @@ app.add_middleware(
 )
 
 app.add_middleware(LoggingMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 
 @app.exception_handler(Exception)
@@ -246,8 +253,38 @@ async def reset_stats():
     return {"message": "统计数据已重置", "timestamp": datetime.now().isoformat()}
 
 
+@app.get(
+    "/api/rate-limit",
+    summary="获取速率限制状态",
+    description="返回当前客户端的速率限制使用情况",
+    tags=["系统"]
+)
+async def get_rate_limit_status(request: Request):
+    """
+    获取当前客户端的速率限制状态
+    
+    返回：
+    - **minute_used/limit**: 每分钟已用/限制
+    - **hour_used/limit**: 每小时已用/限制
+    - **remaining**: 剩余可用次数
+    """
+    api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+    stats = rate_limiter.get_client_stats(request, api_key)
+    
+    return {
+        "enabled": RATE_LIMIT_CONFIG.enabled,
+        "config": {
+            "requests_per_minute": RATE_LIMIT_CONFIG.requests_per_minute,
+            "requests_per_hour": RATE_LIMIT_CONFIG.requests_per_hour,
+            "burst_limit": RATE_LIMIT_CONFIG.burst_limit
+        },
+        "current_usage": stats
+    }
+
+
 app.include_router(chat_router)
 app.include_router(knowledge_router)
+app.include_router(session_router)
 
 
 if __name__ == "__main__":
