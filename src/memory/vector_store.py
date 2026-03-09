@@ -148,7 +148,10 @@ def create_rag_tool(vector_store):
 
 问题：{question}
 
-请基于资料回答，如果资料中没有相关信息，请说明。回答完成后，请在末尾注明参考来源。"""
+请基于上述资料回答问题。注意：
+1. 仅使用资料中的信息回答
+2. 如果资料中没有相关信息，请明确说明
+3. 不要在回答中添加来源引用（系统会自动添加）"""
     )
     
     llm = get_llm()
@@ -181,7 +184,8 @@ def create_rag_tool(vector_store):
             chain = rag_prompt | llm | StrOutputParser()
             answer = chain.invoke({"context": context, "question": query})
             
-            source_note = "\n\n📚 **参考来源**: " + ", ".join(sources)
+            source_list = "\n".join([f"  - {s}" for s in sources])
+            source_note = f"\n\n---\n📚 **参考来源**:\n{source_list}"
             
             return answer + source_note
             
