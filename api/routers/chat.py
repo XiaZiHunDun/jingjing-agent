@@ -22,6 +22,7 @@ from api.schemas import (
     ErrorResponse
 )
 from api.auth import verify_api_key
+from src.utils.logger import chat_logger, RequestStats
 
 router = APIRouter(prefix="/api", tags=["聊天"])
 
@@ -70,17 +71,25 @@ async def chat(
     - **message**: 用户消息内容
     - **session_id**: 会话 ID，用于保持上下文（可选，默认 "default"）
     """
+    chat_logger.info(f"[{request.session_id}] 收到消息: {request.message[:50]}...")
+    
     try:
         agent = get_agent()
         result = agent.chat(request.message, request.session_id)
         
         thinking_steps = []
-        for step in result.get("thinking_steps", []):
+        raw_steps = result.get("thinking_steps", [])
+        for step in raw_steps:
             thinking_steps.append(ToolCall(
                 name=step.get("name", ""),
                 args=step.get("args", {}),
                 result=step.get("result")
             ))
+        
+        RequestStats.record_chat(request.session_id, raw_steps)
+        
+        tool_names = [s.get("name", "") for s in raw_steps]
+        chat_logger.info(f"[{request.session_id}] 回复完成, 工具调用: {tool_names or '无'}")
         
         return ChatResponse(
             answer=result["answer"],
@@ -90,6 +99,7 @@ async def chat(
         )
     
     except Exception as e:
+        chat_logger.error(f"[{request.session_id}] 处理失败: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"处理消息失败: {str(e)}"

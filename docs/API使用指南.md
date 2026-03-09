@@ -54,6 +54,7 @@ API_KEYS=key1,key2,key3
 
 - `GET /` - API 信息
 - `GET /health` - 健康检查
+- `GET /api/stats` - 统计数据
 
 ---
 
@@ -82,7 +83,38 @@ curl http://localhost:8000/health
 
 ---
 
-### 2. 发送消息
+### 2. 获取统计数据
+
+查看 API 调用统计。
+
+```bash
+curl http://localhost:8000/api/stats
+```
+
+**响应示例：**
+```json
+{
+  "start_time": "2026-03-09T10:38:52",
+  "total_requests": 100,
+  "total_chats": 25,
+  "total_errors": 2,
+  "avg_response_time_ms": 150.5,
+  "endpoints": {
+    "POST /api/chat": {"count": 25, "errors": 1, "avg_ms": 2500},
+    "GET /api/tools": {"count": 10, "errors": 0, "avg_ms": 50}
+  },
+  "tools_usage": {
+    "calculator": 5,
+    "get_weather": 8,
+    "search_knowledge_base": 12
+  },
+  "uptime_seconds": 3600
+}
+```
+
+---
+
+### 3. 发送消息
 
 与晶晶助手对话。
 
@@ -117,7 +149,7 @@ curl -X POST http://localhost:8000/api/chat \
 
 ---
 
-### 3. 获取工具列表
+### 4. 获取工具列表
 
 查看可用的工具。
 
@@ -140,7 +172,7 @@ curl -H "X-API-Key: your-api-key" http://localhost:8000/api/tools
 
 ---
 
-### 4. 知识库管理
+### 5. 知识库管理
 
 #### 获取文档列表
 

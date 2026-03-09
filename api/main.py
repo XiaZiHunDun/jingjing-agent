@@ -34,41 +34,46 @@ from api import __version__
 from api.schemas import HealthStatus, ErrorResponse
 from api.routers import chat_router, knowledge_router
 from api.auth import is_auth_enabled
+from api.middleware import LoggingMiddleware
+from src.utils.logger import app_logger, RequestStats
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    print("=" * 50)
-    print("晶晶助手 API 服务启动中...")
-    print(f"版本: {__version__}")
-    print("=" * 50)
+    app_logger.info("=" * 50)
+    app_logger.info("晶晶助手 API 服务启动中...")
+    app_logger.info(f"版本: {__version__}")
+    app_logger.info("=" * 50)
     
     from src.db.chat_history import init_database
     init_database()
-    print("[✓] 数据库初始化完成")
+    app_logger.info("[✓] 数据库初始化完成")
     
     from src.memory.vector_store import get_vector_store
     vs = get_vector_store()
     if vs:
-        print("[✓] 向量数据库加载完成")
+        app_logger.info("[✓] 向量数据库加载完成")
     else:
-        print("[!] 向量数据库为空，请上传文档")
+        app_logger.warning("[!] 向量数据库为空，请上传文档")
     
     if is_auth_enabled():
-        print("[✓] API 认证已启用")
+        app_logger.info("[✓] API 认证已启用")
     else:
-        print("[!] API 认证未启用（开发模式）")
+        app_logger.warning("[!] API 认证未启用（开发模式）")
     
-    print("=" * 50)
-    print("API 服务已就绪")
-    print("  - Swagger UI: http://0.0.0.0:8000/docs")
-    print("  - ReDoc: http://0.0.0.0:8000/redoc")
-    print("=" * 50)
+    app_logger.info("[✓] 日志和监控已启用")
+    
+    app_logger.info("=" * 50)
+    app_logger.info("API 服务已就绪")
+    app_logger.info("  - Swagger UI: http://0.0.0.0:8000/docs")
+    app_logger.info("  - ReDoc: http://0.0.0.0:8000/redoc")
+    app_logger.info("  - 统计接口: http://0.0.0.0:8000/api/stats")
+    app_logger.info("=" * 50)
     
     yield
     
-    print("API 服务关闭")
+    app_logger.info("API 服务关闭")
 
 
 app = FastAPI(
@@ -116,6 +121,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(LoggingMiddleware)
 
 
 @app.exception_handler(Exception)
@@ -203,6 +210,40 @@ async def health_check() -> HealthStatus:
         timestamp=datetime.now(),
         components=components
     )
+
+
+@app.get(
+    "/api/stats",
+    summary="获取统计数据",
+    description="返回 API 调用统计信息",
+    tags=["系统"]
+)
+async def get_stats():
+    """
+    获取 API 统计数据
+    
+    返回：
+    - **total_requests**: 总请求数
+    - **total_chats**: 总对话数
+    - **total_errors**: 错误数
+    - **avg_response_time_ms**: 平均响应时间
+    - **endpoints**: 各接口调用统计
+    - **tools_usage**: 工具使用统计
+    - **uptime_seconds**: 运行时长
+    """
+    return RequestStats.get_stats()
+
+
+@app.post(
+    "/api/stats/reset",
+    summary="重置统计数据",
+    description="清空所有统计数据并重新开始计数",
+    tags=["系统"]
+)
+async def reset_stats():
+    """重置统计数据"""
+    RequestStats.reset()
+    return {"message": "统计数据已重置", "timestamp": datetime.now().isoformat()}
 
 
 app.include_router(chat_router)
