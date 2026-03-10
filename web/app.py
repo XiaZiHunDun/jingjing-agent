@@ -38,7 +38,8 @@ load_dotenv()
 
 # 导入模块化组件
 from src.utils.config import Config
-from src.llm.kimi import get_llm
+from src.llm import get_llm, get_current_provider, set_provider, get_provider_info
+from src.llm.ollama import check_ollama_available
 from src.memory.vector_store import (
     get_embeddings, 
     get_vector_store, 
@@ -117,9 +118,8 @@ st.markdown("""
 # 初始化组件（使用缓存）
 # ============================================================
 
-@st.cache_resource
 def init_llm():
-    """初始化 LLM"""
+    """初始化 LLM（不缓存，支持动态切换）"""
     return get_llm()
 
 
@@ -252,6 +252,53 @@ def render_sidebar():
     """渲染侧边栏"""
     with st.sidebar:
         st.markdown('<p class="main-header">晶晶助手</p>', unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # 模型选择
+        st.subheader("模型选择")
+        
+        current_provider = get_current_provider().value
+        ollama_available = check_ollama_available()
+        
+        # 模型选项
+        model_options = ["ollama", "kimi"]
+        model_labels = {
+            "ollama": "本地模型 (Qwen3-8B)",
+            "kimi": "云端模型 (Kimi API)"
+        }
+        
+        # 当前选中的索引
+        current_index = model_options.index(current_provider) if current_provider in model_options else 0
+        
+        selected = st.radio(
+            "选择模型",
+            model_options,
+            index=current_index,
+            format_func=lambda x: model_labels.get(x, x),
+            label_visibility="collapsed"
+        )
+        
+        # 显示模型状态
+        if selected == "ollama":
+            if ollama_available:
+                st.success("本地模型运行中", icon="✅")
+            else:
+                st.error("本地模型不可用", icon="❌")
+        else:
+            st.info("使用云端 API", icon="☁️")
+        
+        # 切换模型
+        if selected != current_provider:
+            if selected == "ollama" and not ollama_available:
+                st.warning("Ollama 服务未启动，无法切换")
+            else:
+                if set_provider(selected):
+                    # 清除 Agent 缓存
+                    if "memory" in st.session_state:
+                        del st.session_state.memory
+                    st.success(f"已切换到 {model_labels[selected]}")
+                    st.rerun()
         
         st.markdown("---")
         
@@ -427,8 +474,15 @@ def render_sidebar():
         kb_status = "已加载" if vector_store else "未加载"
         doc_count = len(kb_docs) if kb_docs else 0
         
+        # 获取当前模型信息
+        provider_info = get_provider_info()
+        model_name = provider_info.get("model", "未知")
+        if len(model_name) > 20:
+            model_name = model_name.split("/")[-1][:20] + "..."
+        
         st.markdown(f"""
-        - **LLM**: Kimi API
+        - **LLM**: {provider_info['provider'].upper()}
+        - **模型**: {model_name}
         - **知识库**: {kb_status} ({doc_count} 文档)
         - **记忆**: 已启用
         """)

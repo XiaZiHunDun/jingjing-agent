@@ -1,6 +1,6 @@
 # 晶晶助手 API 使用指南
 
-> 更新时间: 2026-03-10 (新增告警通知系统)
+> 更新时间: 2026-03-10 (新增本地模型支持)
 
 ## 快速开始
 
@@ -551,7 +551,102 @@ ALERT_SMTP_RECIPIENTS=admin@example.com,ops@example.com
 
 ---
 
-### 9. 知识库管理
+### 9. 模型管理
+
+支持在 Kimi API 和本地 Ollama 模型之间切换。
+
+#### 获取当前模型信息（无需认证）
+
+```bash
+curl http://localhost:8000/api/models/current
+```
+
+响应：
+```json
+{
+  "provider": "kimi",
+  "model": "moonshot-v1-8k",
+  "base_url": "https://api.moonshot.cn/v1",
+  "available_providers": ["kimi", "ollama"]
+}
+```
+
+#### 获取所有可用提供者
+
+```bash
+curl http://localhost:8000/api/models/providers
+```
+
+响应：
+```json
+{
+  "providers": [
+    {
+      "name": "kimi",
+      "display_name": "Kimi API",
+      "description": "月之暗面 Kimi 云端大模型",
+      "available": true,
+      "is_current": true
+    },
+    {
+      "name": "ollama",
+      "display_name": "Ollama (本地)",
+      "description": "本地部署的 Ollama 模型",
+      "available": true,
+      "is_current": false
+    }
+  ]
+}
+```
+
+#### 切换模型提供者
+
+```bash
+curl -X POST -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "ollama"}' \
+  http://localhost:8000/api/models/switch
+```
+
+响应：
+```json
+{
+  "message": "已切换到 ollama",
+  "current": {
+    "provider": "ollama",
+    "model": "modelscope.cn/Qwen/Qwen3-8B-GGUF:latest",
+    "base_url": "http://localhost:11434",
+    "available_models": ["modelscope.cn/Qwen/Qwen3-8B-GGUF:latest"]
+  }
+}
+```
+
+#### 获取 Ollama 可用模型
+
+```bash
+curl http://localhost:8000/api/models/ollama/models
+```
+
+#### 模型配置
+
+在 `.env` 中配置：
+
+```bash
+# LLM 提供者选择（kimi 或 ollama）
+LLM_PROVIDER=kimi
+
+# Kimi API 配置
+KIMI_API_KEY=your-kimi-api-key
+KIMI_BASE_URL=https://api.moonshot.cn/v1
+
+# Ollama 本地模型配置
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=modelscope.cn/Qwen/Qwen3-8B-GGUF:latest
+```
+
+---
+
+### 10. 知识库管理
 
 #### 获取文档列表
 

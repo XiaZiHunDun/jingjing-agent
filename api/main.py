@@ -32,7 +32,7 @@ load_dotenv()
 
 from api import __version__
 from api.schemas import HealthStatus, ErrorResponse
-from api.routers import chat_router, knowledge_router, session_router, metrics_router, alerts_router
+from api.routers import chat_router, knowledge_router, session_router, metrics_router, alerts_router, models_router
 from api.auth import is_auth_enabled
 from api.middleware import LoggingMiddleware, RateLimitMiddleware
 from api.rate_limit import rate_limiter, DEFAULT_CONFIG as RATE_LIMIT_CONFIG
@@ -315,6 +315,7 @@ app.include_router(knowledge_router)
 app.include_router(session_router)
 app.include_router(metrics_router)
 app.include_router(alerts_router)
+app.include_router(models_router)
 
 
 if __name__ == "__main__":

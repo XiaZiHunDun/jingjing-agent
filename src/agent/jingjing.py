@@ -9,7 +9,7 @@ from langchain_core.tools import BaseTool
 from langchain.agents import create_agent
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.llm.kimi import get_llm
+from src.llm import get_llm, get_current_provider
 from src.tools import get_basic_tools
 from src.memory.vector_store import get_vector_store, create_rag_tool
 
@@ -203,9 +203,18 @@ class JingjingAgent:
         self.tools = self._build_tools()
         self.agent = self._build_agent()
     
+    def refresh_llm(self):
+        """刷新 LLM 实例（用于切换模型后）"""
+        self.llm = get_llm()
+        self.agent = self._build_agent()
+    
     def get_tool_names(self) -> List[str]:
         """获取当前可用的工具名称列表"""
         return [tool.name for tool in self.tools]
+    
+    def get_llm_provider(self) -> str:
+        """获取当前使用的 LLM 提供者"""
+        return get_current_provider().value
 
 
 def create_jingjing_agent(
