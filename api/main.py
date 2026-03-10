@@ -32,12 +32,13 @@ load_dotenv()
 
 from api import __version__
 from api.schemas import HealthStatus, ErrorResponse
-from api.routers import chat_router, knowledge_router, session_router, metrics_router
+from api.routers import chat_router, knowledge_router, session_router, metrics_router, alerts_router
 from api.auth import is_auth_enabled
 from api.middleware import LoggingMiddleware, RateLimitMiddleware
 from api.rate_limit import rate_limiter, DEFAULT_CONFIG as RATE_LIMIT_CONFIG
 from src.utils.logger import app_logger, RequestStats
 from src.metrics import metrics_enabled, get_metrics_client
+from src.alerts import get_alert_checker, get_notifier
 
 
 @asynccontextmanager
@@ -79,6 +80,13 @@ async def lifespan(app: FastAPI):
             app_logger.warning("[!] InfluxDB 连接失败")
     else:
         app_logger.info("[!] InfluxDB 时序数据库未启用")
+    
+    # 初始化告警系统
+    alert_checker = get_alert_checker()
+    notifier = get_notifier()
+    alert_checker.set_notifier(notifier)
+    alert_checker.start()
+    app_logger.info(f"[✓] 告警系统已启用 ({len(alert_checker.rules)} 条规则)")
     
     app_logger.info("=" * 50)
     app_logger.info("API 服务已就绪")
@@ -306,6 +314,7 @@ app.include_router(chat_router)
 app.include_router(knowledge_router)
 app.include_router(session_router)
 app.include_router(metrics_router)
+app.include_router(alerts_router)
 
 
 if __name__ == "__main__":

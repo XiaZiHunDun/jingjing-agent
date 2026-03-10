@@ -1,6 +1,6 @@
 # 晶晶助手 API 使用指南
 
-> 更新时间: 2026-03-10 (新增流式响应)
+> 更新时间: 2026-03-10 (新增告警通知系统)
 
 ## 快速开始
 
@@ -408,7 +408,150 @@ curl -H "X-API-Key: your-api-key" \
 
 ---
 
-### 8. 知识库管理
+### 8. 告警管理
+
+告警系统会自动监控关键指标，当指标超过阈值时触发告警并发送通知。
+
+#### 获取告警系统状态（无需认证）
+
+```bash
+curl http://localhost:8000/api/alerts/status
+```
+
+响应：
+```json
+{
+  "enabled": true,
+  "rules_count": 4,
+  "active_alerts_count": 0,
+  "notification_channels": ["ConsoleChannel"]
+}
+```
+
+#### 获取当前活跃告警
+
+```bash
+curl -H "X-API-Key: your-api-key" http://localhost:8000/api/alerts/active
+```
+
+响应：
+```json
+[
+  {
+    "rule_name": "high_response_time",
+    "level": "warning",
+    "status": "firing",
+    "message": "API 响应时间过高: 当前值 6500.00, 阈值 5000.0",
+    "value": 6500.0,
+    "threshold": 5000.0,
+    "triggered_at": "2026-03-10T12:30:00",
+    "resolved_at": null,
+    "notified": true
+  }
+]
+```
+
+#### 获取告警历史
+
+```bash
+curl -H "X-API-Key: your-api-key" "http://localhost:8000/api/alerts/history?limit=50"
+```
+
+#### 获取告警规则
+
+```bash
+curl -H "X-API-Key: your-api-key" http://localhost:8000/api/alerts/rules
+```
+
+响应：
+```json
+[
+  {
+    "name": "high_response_time",
+    "description": "API 响应时间过高",
+    "metric": "api_response_time_avg",
+    "condition": "gt",
+    "threshold": 5000.0,
+    "level": "warning",
+    "duration_minutes": 5,
+    "enabled": true
+  },
+  {
+    "name": "high_error_rate",
+    "description": "错误率过高",
+    "metric": "api_error_rate",
+    "condition": "gt",
+    "threshold": 0.1,
+    "level": "critical",
+    "duration_minutes": 5,
+    "enabled": true
+  }
+]
+```
+
+#### 更新告警规则
+
+```bash
+curl -X PUT -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"threshold": 10000, "enabled": true}' \
+  http://localhost:8000/api/alerts/rules/high_response_time
+```
+
+#### 测试告警通知
+
+```bash
+curl -X POST -H "X-API-Key: your-api-key" http://localhost:8000/api/alerts/test
+```
+
+响应：
+```json
+{
+  "message": "测试通知已发送",
+  "channels": {
+    "ConsoleChannel": true,
+    "DingTalkChannel": true
+  }
+}
+```
+
+#### 手动触发告警检查
+
+```bash
+curl -X POST -H "X-API-Key: your-api-key" http://localhost:8000/api/alerts/check
+```
+
+#### 告警配置
+
+在 `.env` 中配置告警参数和通知渠道：
+
+```bash
+# 告警检查间隔（秒）
+ALERT_CHECK_INTERVAL=60
+
+# 告警阈值
+ALERT_RESPONSE_TIME_MS=5000    # API 响应时间阈值（毫秒）
+ALERT_ERROR_RATE=0.1           # 错误率阈值（0.1 = 10%）
+ALERT_CHAT_TIMEOUT_MS=30000    # 对话超时阈值（毫秒）
+
+# 钉钉机器人（可选）
+ALERT_DINGTALK_WEBHOOK=https://oapi.dingtalk.com/robot/send?access_token=xxx
+
+# 企业微信机器人（可选）
+ALERT_WECHAT_WEBHOOK=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+
+# 邮件通知（可选）
+ALERT_SMTP_HOST=smtp.example.com
+ALERT_SMTP_PORT=587
+ALERT_SMTP_USER=user@example.com
+ALERT_SMTP_PASSWORD=password
+ALERT_SMTP_SENDER=alerts@example.com
+ALERT_SMTP_RECIPIENTS=admin@example.com,ops@example.com
+```
+
+---
+
+### 9. 知识库管理
 
 #### 获取文档列表
 
