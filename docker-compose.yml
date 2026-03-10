@@ -17,6 +17,7 @@ services:
     container_name: jingjing-agent
     ports:
       - "8501:8501"
+      - "8000:8000"
     volumes:
       # 持久化数据目录
       - ./data:/app/data
@@ -27,6 +28,12 @@ services:
       - TZ=Asia/Shanghai
       - KIMI_API_KEY=${KIMI_API_KEY}
       - KIMI_BASE_URL=${KIMI_BASE_URL:-https://api.moonshot.cn/v1}
+      # InfluxDB 配置
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-jingjing}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-metrics}
+      - INFLUXDB_ENABLED=${INFLUXDB_ENABLED:-false}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
@@ -34,7 +41,35 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    depends_on:
+      influxdb:
+        condition: service_healthy
 
-# 可选：如果需要独立的向量数据库服务
-# volumes:
-#   chroma_data:
+  # InfluxDB 时序数据库服务
+  influxdb:
+    image: influxdb:2.7
+    container_name: jingjing-influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_ADMIN_USER:-admin}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD:-jingjing123}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-jingjing}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-metrics}
+      - DOCKER_INFLUXDB_INIT_RETENTION=30d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN:-jingjing-influxdb-token}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  influxdb_data:
+  influxdb_config:

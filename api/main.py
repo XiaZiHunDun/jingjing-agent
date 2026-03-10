@@ -32,11 +32,12 @@ load_dotenv()
 
 from api import __version__
 from api.schemas import HealthStatus, ErrorResponse
-from api.routers import chat_router, knowledge_router, session_router
+from api.routers import chat_router, knowledge_router, session_router, metrics_router
 from api.auth import is_auth_enabled
 from api.middleware import LoggingMiddleware, RateLimitMiddleware
 from api.rate_limit import rate_limiter, DEFAULT_CONFIG as RATE_LIMIT_CONFIG
 from src.utils.logger import app_logger, RequestStats
+from src.metrics import metrics_enabled, get_metrics_client
 
 
 @asynccontextmanager
@@ -70,11 +71,21 @@ async def lifespan(app: FastAPI):
     else:
         app_logger.warning("[!] 速率限制未启用")
     
+    if metrics_enabled():
+        client = get_metrics_client()
+        if client and client.is_connected():
+            app_logger.info(f"[✓] InfluxDB 时序数据库已连接")
+        else:
+            app_logger.warning("[!] InfluxDB 连接失败")
+    else:
+        app_logger.info("[!] InfluxDB 时序数据库未启用")
+    
     app_logger.info("=" * 50)
     app_logger.info("API 服务已就绪")
     app_logger.info("  - Swagger UI: http://0.0.0.0:8000/docs")
     app_logger.info("  - ReDoc: http://0.0.0.0:8000/redoc")
     app_logger.info("  - 统计接口: http://0.0.0.0:8000/api/stats")
+    app_logger.info("  - 指标接口: http://0.0.0.0:8000/api/metrics/summary")
     app_logger.info("=" * 50)
     
     yield
@@ -211,6 +222,15 @@ async def health_check() -> HealthStatus:
     
     components["auth"] = "enabled" if is_auth_enabled() else "disabled"
     
+    if metrics_enabled():
+        client = get_metrics_client()
+        if client and client.is_connected():
+            components["influxdb"] = "connected"
+        else:
+            components["influxdb"] = "disconnected"
+    else:
+        components["influxdb"] = "disabled"
+    
     return HealthStatus(
         status="healthy" if overall_healthy else "unhealthy",
         version=__version__,
@@ -285,6 +305,7 @@ async def get_rate_limit_status(request: Request):
 app.include_router(chat_router)
 app.include_router(knowledge_router)
 app.include_router(session_router)
+app.include_router(metrics_router)
 
 
 if __name__ == "__main__":

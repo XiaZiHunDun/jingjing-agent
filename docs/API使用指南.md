@@ -1,6 +1,6 @@
 # 晶晶助手 API 使用指南
 
-> 更新时间: 2026-03-09
+> 更新时间: 2026-03-10 (新增流式响应)
 
 ## 快速开始
 
@@ -56,6 +56,7 @@ API_KEYS=key1,key2,key3
 - `GET /health` - 健康检查
 - `GET /api/stats` - 统计数据
 - `GET /api/rate-limit` - 速率限制状态
+- `GET /api/metrics/health` - 指标服务健康状态
 
 ---
 
@@ -116,7 +117,9 @@ curl http://localhost:8000/health
   "components": {
     "llm": "connected",
     "vector_store": "loaded",
-    "database": "connected"
+    "database": "connected",
+    "auth": "enabled",
+    "influxdb": "connected"
   }
 }
 ```
@@ -156,7 +159,9 @@ curl http://localhost:8000/api/stats
 
 ### 3. 发送消息
 
-与晶晶助手对话。
+与晶晶助手对话，支持普通响应和流式响应两种模式。
+
+#### 普通模式
 
 ```bash
 curl -X POST http://localhost:8000/api/chat \
@@ -170,6 +175,7 @@ curl -X POST http://localhost:8000/api/chat \
 |------|------|------|------|
 | message | string | 是 | 用户消息 |
 | session_id | string | 否 | 会话ID，用于保持上下文 |
+| stream | boolean | 否 | 是否启用流式响应（默认 false） |
 
 **响应示例：**
 ```json
@@ -184,6 +190,76 @@ curl -X POST http://localhost:8000/api/chat \
     }
   ],
   "timestamp": "2026-03-09T10:30:00"
+}
+```
+
+#### 流式模式（SSE）
+
+设置 `stream: true` 启用流式响应，实时接收 AI 输出。
+
+```bash
+curl -N -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"message": "计算 15 * 23", "session_id": "user_001", "stream": true}'
+```
+
+**响应格式（Server-Sent Events）：**
+```
+data: {"event": "tool_start", "name": "calculator", "args": {"expression": "15*23"}}
+
+data: {"event": "tool_end", "name": "calculator", "result": "计算结果: 345"}
+
+data: {"event": "token", "content": "计算"}
+
+data: {"event": "token", "content": "结果"}
+
+data: {"event": "token", "content": "为 345。"}
+
+data: {"event": "done", "answer": "计算结果为 345。", "thinking_steps": [...], "session_id": "user_001"}
+```
+
+**事件类型：**
+| event | 说明 |
+|-------|------|
+| tool_start | 开始调用工具 |
+| tool_end | 工具返回结果 |
+| token | AI 输出的文本片段 |
+| done | 完成，包含完整回答 |
+| error | 发生错误 |
+
+**前端使用示例（JavaScript）：**
+```javascript
+const eventSource = new EventSource('/api/chat?...');  // 或使用 fetch + ReadableStream
+
+// 使用 fetch 的流式处理
+const response = await fetch('/api/chat', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your-api-key'
+  },
+  body: JSON.stringify({ message: '你好', stream: true })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  
+  const text = decoder.decode(value);
+  const lines = text.split('\n');
+  
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const event = JSON.parse(line.slice(6));
+      if (event.event === 'token') {
+        console.log(event.content);  // 实时显示
+      }
+    }
+  }
 }
 ```
 
@@ -250,7 +326,89 @@ curl -X DELETE -H "X-API-Key: your-api-key" \
 
 ---
 
-### 7. 知识库管理
+### 7. 指标查询（时序数据库）
+
+需要启用 InfluxDB 后使用。在 `.env` 中配置：
+
+```bash
+INFLUXDB_ENABLED=true
+INFLUXDB_URL=http://localhost:8086
+INFLUXDB_TOKEN=your-token
+INFLUXDB_ORG=jingjing
+INFLUXDB_BUCKET=metrics
+```
+
+启动 InfluxDB 容器：
+
+```bash
+docker compose up -d influxdb
+```
+
+#### 获取指标概要
+
+```bash
+curl -H "X-API-Key: your-api-key" "http://localhost:8000/api/metrics/summary?hours=24"
+```
+
+**响应示例：**
+```json
+{
+  "enabled": true,
+  "connected": true,
+  "api_stats": {
+    "total": 150,
+    "avg_duration_ms": 534.9,
+    "max_duration_ms": 1916.0,
+    "min_duration_ms": 0.7
+  },
+  "tool_usage": [
+    {"tool": "get_weather", "count": 10},
+    {"tool": "calculator", "count": 5}
+  ]
+}
+```
+
+#### 获取 API 请求指标
+
+```bash
+curl -H "X-API-Key: your-api-key" "http://localhost:8000/api/metrics/requests?hours=24"
+```
+
+#### 获取工具使用指标
+
+```bash
+curl -H "X-API-Key: your-api-key" "http://localhost:8000/api/metrics/tools?hours=24"
+```
+
+#### 获取趋势数据
+
+```bash
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8000/api/metrics/trends?measurement=api_requests&field=duration_ms&hours=24&interval=1h"
+```
+
+**响应示例：**
+```json
+{
+  "measurement": "api_requests",
+  "field": "duration_ms",
+  "interval": "1h",
+  "data": [
+    {"time": "2026-03-10T02:00:00+00:00", "value": 150.5},
+    {"time": "2026-03-10T03:00:00+00:00", "value": 200.3}
+  ]
+}
+```
+
+**支持的 measurement：**
+- `api_requests` - API 请求指标
+- `chat_metrics` - 对话指标
+- `tool_calls` - 工具调用指标
+- `system_metrics` - 系统资源指标
+
+---
+
+### 8. 知识库管理
 
 #### 获取文档列表
 

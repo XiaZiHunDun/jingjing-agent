@@ -12,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.utils.logger import api_logger, RequestStats
 from api.rate_limit import rate_limiter
+from src.metrics import record_api_request, metrics_enabled
 
 
 RATE_LIMITED_PATHS = ["/api/chat", "/api/knowledge/upload"]
@@ -76,12 +77,24 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         finally:
             duration_ms = (time.time() - start_time) * 1000
             
+            final_status = status_code if 'status_code' in dir() else 500
+            
             RequestStats.record_request(
                 endpoint=path,
                 method=method,
-                status_code=status_code if 'status_code' in dir() else 500,
+                status_code=final_status,
                 duration_ms=duration_ms
             )
+            
+            if metrics_enabled():
+                api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+                record_api_request(
+                    endpoint=path,
+                    method=method,
+                    status_code=final_status,
+                    duration_ms=duration_ms,
+                    client_id=api_key or client_ip
+                )
         
         log_msg = f"{client_ip} | {method} {path} | {status_code} | {duration_ms:.1f}ms"
         

@@ -4,7 +4,7 @@
 封装晶晶助手的核心 Agent 逻辑。
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Generator
 from langchain_core.tools import BaseTool
 from langchain.agents import create_agent
 from langgraph.checkpoint.memory import MemorySaver
@@ -85,6 +85,87 @@ class JingjingAgent:
             "thinking_steps": thinking_steps,
             "raw_result": result
         }
+    
+    def chat_stream(self, message: str, session_id: str = "default") -> Generator[Dict[str, Any], None, None]:
+        """
+        流式对话
+        
+        生成器返回不同类型的事件：
+        - {"event": "tool_start", "name": "...", "args": {...}}
+        - {"event": "tool_end", "name": "...", "result": "..."}
+        - {"event": "token", "content": "..."}
+        - {"event": "done", "answer": "...", "thinking_steps": [...]}
+        """
+        from langchain_core.messages import HumanMessage, AIMessageChunk, ToolMessage
+        
+        config = {"configurable": {"thread_id": session_id}}
+        
+        thinking_steps = []
+        current_tool_calls = {}
+        final_answer = ""
+        
+        try:
+            for event in self.agent.stream(
+                {"messages": [HumanMessage(content=message)]},
+                config=config,
+                stream_mode="messages"
+            ):
+                msg, metadata = event
+                
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        tool_id = tc.get("id", "")
+                        tool_name = tc.get("name", "")
+                        tool_args = tc.get("args", {})
+                        
+                        if tool_id not in current_tool_calls:
+                            current_tool_calls[tool_id] = {
+                                "name": tool_name,
+                                "args": tool_args
+                            }
+                            yield {
+                                "event": "tool_start",
+                                "name": tool_name,
+                                "args": tool_args
+                            }
+                
+                if isinstance(msg, ToolMessage):
+                    tool_id = msg.tool_call_id
+                    tool_result = msg.content
+                    
+                    if tool_id in current_tool_calls:
+                        tool_info = current_tool_calls[tool_id]
+                        thinking_steps.append({
+                            "name": tool_info["name"],
+                            "args": tool_info["args"],
+                            "result": tool_result
+                        })
+                        yield {
+                            "event": "tool_end",
+                            "name": tool_info["name"],
+                            "result": tool_result
+                        }
+                
+                if isinstance(msg, AIMessageChunk):
+                    if msg.content and not msg.tool_calls:
+                        final_answer += msg.content
+                        yield {
+                            "event": "token",
+                            "content": msg.content
+                        }
+            
+            yield {
+                "event": "done",
+                "answer": final_answer,
+                "thinking_steps": thinking_steps,
+                "session_id": session_id
+            }
+            
+        except Exception as e:
+            yield {
+                "event": "error",
+                "message": str(e)
+            }
     
     def _extract_thinking_steps(self, messages: List) -> List[Dict]:
         """从消息中提取思考过程"""

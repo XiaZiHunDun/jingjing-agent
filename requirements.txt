@@ -34,3 +34,7 @@ rich>=13.9.0
 # 文档处理
 pypdf>=3.0.0
 python-docx>=0.8.11
+
+# 时序数据库和监控
+influxdb-client>=1.40.0
+psutil>=5.9.0

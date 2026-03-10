@@ -17,17 +17,32 @@ class ChatRequest(BaseModel):
     """聊天请求"""
     message: str = Field(..., description="用户消息", min_length=1, max_length=10000)
     session_id: Optional[str] = Field(default="default", description="会话 ID")
+    stream: Optional[bool] = Field(default=False, description="是否启用流式响应")
     
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
                     "message": "北京天气怎么样？",
-                    "session_id": "user_001"
+                    "session_id": "user_001",
+                    "stream": False
                 }
             ]
         }
     }
+
+
+class StreamEvent(BaseModel):
+    """流式事件"""
+    event: str = Field(..., description="事件类型: tool_start/tool_end/token/done/error")
+    name: Optional[str] = Field(default=None, description="工具名称")
+    args: Optional[Dict[str, Any]] = Field(default=None, description="工具参数")
+    result: Optional[str] = Field(default=None, description="工具结果")
+    content: Optional[str] = Field(default=None, description="Token 内容")
+    answer: Optional[str] = Field(default=None, description="完整回答（done 事件）")
+    thinking_steps: Optional[List[Dict[str, Any]]] = Field(default=None, description="思考步骤")
+    session_id: Optional[str] = Field(default=None, description="会话 ID")
+    message: Optional[str] = Field(default=None, description="错误信息")
 
 
 class ToolCall(BaseModel):

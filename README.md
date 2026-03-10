@@ -1,22 +1,36 @@
-# 🤖 Agent Learn 2
+# 🤖 Agent Learn 2 - 晶晶助手
 
-一个基于 LangChain + Kimi API 的智能体（Agent）学习项目。
+一个功能完整的智能体（Agent）系统，基于 LangChain + Kimi API 构建。
 
 ## ✨ 功能特性
 
-- 💬 **智能对话** - 基于 Kimi API 的多轮对话
-- 🔧 **工具调用** - ReAct 模式的 Agent，可调用计算器、时间查询等工具
-- 📚 **RAG 知识库** - 本地文档检索增强生成
-- 🧠 **对话记忆** - 支持多会话的对话记忆
-- 🌐 **Web 界面** - Streamlit 构建的聊天界面
-- 📄 **文档上传** - 可上传文档到知识库
+### 核心功能
+- 💬 **智能对话** - 基于 Kimi API 的多轮对话，支持上下文记忆
+- 🔧 **工具调用** - ReAct 模式 Agent，支持计算器、天气、翻译等工具
+- 📚 **RAG 知识库** - 本地文档检索增强生成，支持来源引用
+- 🧠 **对话记忆** - SQLite 持久化存储，支持多会话管理
 
-## 📖 部署文档
+### API 服务
+- 🌐 **RESTful API** - FastAPI 构建的完整后端接口
+- 🔐 **API 认证** - 支持 API Key 认证
+- 📊 **监控统计** - 请求日志、性能统计、调用计数
+- ⏱️ **速率限制** - 防止 API 滥用，可配置限制规则
 
-| 方式 | 文档 | 适用场景 |
-|------|------|----------|
-| 🐍 **本地部署** | [本地部署指南.md](docs/本地部署指南.md) | 开发调试、本地使用 |
-| 🐳 **Docker 部署** | [Docker部署指南.md](docs/Docker部署指南.md) | 生产部署、快速迁移 |
+### 部署方式
+- 🐍 **本地部署** - Conda 环境，开发调试
+- 🐳 **Docker 部署** - 容器化部署，生产环境
+
+---
+
+## 📖 文档导航
+
+| 文档 | 说明 |
+|------|------|
+| [本地部署指南](docs/本地部署指南.md) | Conda 环境部署 |
+| [Docker部署指南](docs/Docker部署指南.md) | 容器化部署 |
+| [API使用指南](docs/API使用指南.md) | API 接口文档 |
+| [测试手册](docs/测试手册.md) | 功能测试说明 |
+| [功能计划](docs/功能计划.md) | 功能规划和进度 |
 
 ---
 
@@ -28,90 +42,113 @@
 # 激活 conda 环境
 conda activate agent-learn
 
-# 安装依赖（如果还没安装）
+# 安装依赖
 pip install -r requirements.txt
 ```
 
 ### 2. 配置环境变量
 
-确保 `.env` 文件已配置：
+编辑 `.env` 文件：
 
 ```env
+# Kimi API
 KIMI_API_KEY=your_api_key
 KIMI_BASE_URL=https://api.moonshot.cn/v1
-HTTP_PROXY=http://your-proxy:port  # 如需代理
+
+# API 认证
+API_KEYS=your-api-key
+
+# 速率限制
+RATE_LIMIT_PER_MINUTE=60
+
+# 代理（可选）
+HTTP_PROXY=http://your-proxy:port
 ```
 
 ### 3. 启动服务
 
 ```bash
-# 方式 1：使用启动脚本（推荐）
-./start.sh
-
-# 方式 2：手动启动
+# 启动 Web 界面
 streamlit run web/app.py --server.address 0.0.0.0 --server.port 8501
+
+# 启动 API 服务
+uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 4. 访问界面
+### 4. 访问服务
 
-- **本地访问**: http://localhost:8501
-- **远程访问**: http://<服务器IP>:8501
+| 服务 | 地址 |
+|------|------|
+| Web 界面 | http://localhost:8501 |
+| API 文档 | http://localhost:8000/docs |
+| 健康检查 | http://localhost:8000/health |
+
+---
+
+## 🔌 API 接口
+
+### 主要接口
+
+| 接口 | 方法 | 说明 | 认证 |
+|------|------|------|------|
+| `/health` | GET | 健康检查 | 否 |
+| `/api/stats` | GET | 统计数据 | 否 |
+| `/api/rate-limit` | GET | 速率限制状态 | 否 |
+| `/api/chat` | POST | 发送消息 | 是 |
+| `/api/tools` | GET | 工具列表 | 是 |
+| `/api/knowledge` | GET | 知识库文档 | 是 |
+| `/api/sessions` | GET | 会话列表 | 是 |
+
+### 调用示例
+
+```bash
+# 发送消息
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"message": "你好"}'
+```
+
+详细文档见 [API使用指南](docs/API使用指南.md)
+
+---
 
 ## 📁 项目结构
 
 ```
 agent-learn-2/
-├── src/                    # 源代码
+├── api/                    # FastAPI 后端
+│   ├── main.py             # API 入口
+│   ├── auth.py             # 认证模块
+│   ├── rate_limit.py       # 速率限制
+│   ├── middleware.py       # 中间件
+│   ├── schemas.py          # 数据模型
+│   └── routers/            # 路由模块
+│       ├── chat.py         # 聊天接口
+│       ├── knowledge.py    # 知识库接口
+│       └── session.py      # 会话接口
+├── src/                    # 核心源码
 │   ├── agent/              # Agent 实现
 │   ├── llm/                # LLM 封装
-│   ├── memory/             # 记忆系统
+│   ├── memory/             # 向量存储
 │   ├── tools/              # 工具定义
-│   ├── chains/             # 链式调用
+│   ├── db/                 # 数据库
 │   └── utils/              # 工具函数
 ├── web/
-│   └── app.py              # Streamlit Web 界面
-├── examples/               # 学习示例
-│   ├── 00_test_kimi_api.py       # API 测试
-│   ├── 01_prompt_engineering.py  # Prompt 工程
-│   ├── 02_react_agent.py         # ReAct Agent
-│   ├── 03_rag_basics.py          # RAG 基础
-│   ├── 04_memory_system.py       # 记忆系统
-│   └── 05_langgraph_advanced.py  # LangGraph 高级
+│   └── app.py              # Streamlit 界面
 ├── data/
 │   ├── docs/               # 知识库文档
 │   └── chroma_db/          # 向量数据库
-├── config/                 # 配置文件
-├── tests/                  # 测试代码
-├── .env                    # 环境变量（不提交 Git）
-├── .env.example            # 环境变量模板
-├── requirements.txt        # Python 依赖
-├── start.sh                # 一键启动脚本
-├── plan.md                 # 开发计划
-├── DEV_ENV.md              # 开发环境文档
-├── PROGRESS.md             # 进度追踪
-└── README.md               # 本文件
+├── logs/                   # 日志文件
+├── docs/                   # 文档
+├── examples/               # 学习示例
+├── .env                    # 环境配置
+├── Dockerfile              # Docker 构建
+├── docker-compose.yml      # Docker Compose
+└── requirements.txt        # Python 依赖
 ```
 
-## 📖 学习路径
-
-本项目是一个渐进式的 Agent 学习项目，建议按以下顺序学习：
-
-| 阶段 | 文件 | 内容 |
-|------|------|------|
-| 1 | `00_test_kimi_api.py` | 测试 API 连接 |
-| 2 | `01_prompt_engineering.py` | Prompt 模板、Few-shot |
-| 3 | `02_react_agent.py` | ReAct Agent、工具调用 |
-| 4 | `03_rag_basics.py` | RAG 检索增强生成 |
-| 5 | `04_memory_system.py` | 对话记忆系统 |
-| 6 | `05_langgraph_advanced.py` | LangGraph 高级工作流 |
-
-运行示例：
-
-```bash
-cd /home/ailearn/projects/agent-learn-2
-conda activate agent-learn
-python examples/01_prompt_engineering.py
-```
+---
 
 ## 🛠️ 技术栈
 
@@ -120,51 +157,67 @@ python examples/01_prompt_engineering.py
 | LLM | Kimi API (Moonshot AI) |
 | Agent 框架 | LangChain + LangGraph |
 | 向量数据库 | ChromaDB |
-| Embedding | HuggingFace (multilingual) |
+| Embedding | HuggingFace (multilingual-MiniLM) |
 | Web 框架 | Streamlit |
+| API 框架 | FastAPI |
+| 数据库 | SQLite |
 | 语言 | Python 3.11 |
 
-## 📊 里程碑
+---
 
-- [x] M1: 基础对话
-- [x] M2: ReAct Agent
-- [x] M3: 自定义工具
-- [x] M4: 记忆与 RAG
-- [x] M5: LangGraph 高级
-- [x] M6: Web 服务
-- [x] M7: 完整应用
+## 📊 功能完成状态
+
+| 模块 | 功能 | 状态 |
+|------|------|------|
+| 核心 | 智能对话 | ✅ |
+| 核心 | RAG 知识库 | ✅ |
+| 核心 | 来源引用 | ✅ |
+| API | RESTful 接口 | ✅ |
+| API | 认证 (API Key) | ✅ |
+| API | 速率限制 | ✅ |
+| API | 监控统计 | ✅ |
+| API | 会话管理 | ✅ |
+| 部署 | Docker | ✅ |
+| 部署 | 本地模型 | ⏸️ 需GPU |
+
+---
 
 ## 🔧 常用命令
 
 ```bash
 # 启动 Web 服务
-./start.sh
+streamlit run web/app.py --server.address 0.0.0.0 --server.port 8501
+
+# 启动 API 服务
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+
+# Docker 部署
+docker compose up -d
+
+# 查看日志
+tail -f logs/api.log
 
 # 停止服务
-pkill -f "streamlit run"
-
-# 查看服务状态
-ps aux | grep streamlit
-
-# 运行测试
-python examples/00_test_kimi_api.py
+pkill -f "streamlit\|uvicorn"
 ```
 
-## 📝 配置说明
+---
 
-### Kimi API
+## 📝 更新日志
 
-- 获取 API Key: https://platform.moonshot.cn/
-- 可用模型: `moonshot-v1-8k`, `moonshot-v1-32k`, `moonshot-v1-128k`
+### 2026-03-09
+- ✅ FastAPI 后端完善
+- ✅ API 认证 (API Key)
+- ✅ 日志和监控系统
+- ✅ 会话管理 API
+- ✅ 速率限制
 
-### 代理配置
+### 2026-02-27
+- ✅ 知识库管理完善
+- ✅ RAG 来源引用
+- ✅ Docker 部署优化
 
-如果需要通过代理访问 API，在 `.env` 中配置：
-
-```env
-HTTP_PROXY=http://your-proxy:port
-HTTPS_PROXY=http://your-proxy:port
-```
+---
 
 ## 📄 License
 
@@ -172,4 +225,4 @@ MIT License
 
 ---
 
-*创建时间: 2026-01-26*
+*创建时间: 2026-01-26 | 最后更新: 2026-03-09*
